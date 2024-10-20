@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "image-based-spotify-list-ai-agent"
+version = "0.1.0"
+description = ""
+authors = ["Joy Cheng <joy.cheng@phntms.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.12.4"
+spotipy = "^2.24.0"
+langchain = "^0.3.3"
+langchain-community = "^0.3.3"
+langchain-openai = "^0.2.3"
+langgraph = "^0.2.39"
+langchain-google-vertexai = "^2.0.5"
+vertexai = "^1.70.0"
+streamlit = "^1.39.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
