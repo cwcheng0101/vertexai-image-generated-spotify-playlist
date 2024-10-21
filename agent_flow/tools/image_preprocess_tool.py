@@ -17,8 +17,13 @@ class ImagePreprocessInput(BaseModel):
 class ImagePreprocessTool(BaseTool):
     name: str = "ImagePreprocessTool"
     description: str = (
-        "A tool that analyzes an image and returns a description of its content, mood, and potential musical themes. "
-        "This tool requires the string data of an image file."
+        '''
+        A tool that analyzes an image and returns a description which address below asks:
+        Ask1: What kind of music vibe, mood and musical themes could symbolize or expressed by this image?
+        Ask2: What kinds of tone of the playlist will this image leads to?
+        
+        ***This tool requires the string data of an image file as input***
+        '''
     )
     args_schema: Type[BaseModel] = ImagePreprocessInput
     model: ChatVertexAI = ChatVertexAI(

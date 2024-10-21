@@ -3,10 +3,9 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from agent_flow.agent import Agent
-import uuid
+from agent_flow.tools.spotify_playlist_tool import SpotifyPlaylistTool
 from dotenv import load_dotenv
-from PIL import Image
-import io
+import json
 import base64
 
 load_dotenv()
@@ -35,6 +34,30 @@ def image_to_data_url(image_file):
     base64_image = base64.b64encode(image_file.getvalue()).decode()
     return f"data:{mime_type};base64,{base64_image}"
 
+def display_playlist_curation(curation):
+    st.subheader("Playlist Curation")
+    
+    # Allow direct editing of playlist name and description
+    curation['playlist_name'] = st.text_input("Playlist Name:", curation['playlist_name'])
+    curation['playlist_description'] = st.text_area("Playlist Description:", curation['playlist_description'])
+    
+    st.write("Tracks:")
+    for track in curation['tracks']:
+        st.write(f"- {track['song_name']} by {track['artists']}")
+        with st.expander("Track Features"):
+            st.json(track['features'])
+    
+    st.write("Curation Summary:")
+    st.write(curation['summary'])
+
+def generate_curation(agent, input_type, user_input, num_songs):
+    if input_type == "Image Upload":
+        question = f"Create a playlist curation with {num_songs} songs"
+        return agent.process_request(question, image_string=user_input)
+    else:
+        question = f"Create a playlist with {num_songs} songs that match the following requirements: {user_input}"
+        return agent.process_request(question)
+
 def main():
     st.set_page_config(page_title="Spotify Playlist Creator", page_icon="🎵")
     st.title("Spotify Playlist Creator")
@@ -45,6 +68,18 @@ def main():
     # Initialize session state
     if 'token_info' not in st.session_state:
         st.session_state.token_info = None
+    if 'curation' not in st.session_state:
+        st.session_state.curation = None
+    if 'input_type' not in st.session_state:
+        st.session_state.input_type = None
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = None
+    if 'num_songs' not in st.session_state:
+        st.session_state.num_songs = 10
+    if 'playlist_created' not in st.session_state:
+        st.session_state.playlist_created = False
+    if 'regenerating' not in st.session_state:
+        st.session_state.regenerating = False
 
     # Check if we're in the authentication callback
     if 'code' in st.query_params:
@@ -72,38 +107,65 @@ def main():
             st.session_state.agent = Agent(st.session_state.token_info['access_token'], user['id'])
 
         # User input
-        input_type = st.radio("Choose input type:", ("Image Upload", "Text Description"))
+        st.session_state.input_type = st.radio("Choose input type:", ("Image Upload", "Text Description"))
 
-        user_input = None
-        if input_type == "Image Upload":
+        if st.session_state.input_type == "Image Upload":
             uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
-            image_string = image_to_data_url(uploaded_file)
-            if image_string:
-                user_input = image_string
+            if uploaded_file:
+                st.session_state.user_input = image_to_data_url(uploaded_file)
+                st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
         else:
-            user_input = st.text_area("Enter a description for your playlist:")
+            st.session_state.user_input = st.text_area("Enter a description / mood / vibe for your playlist:")
 
-        num_songs = st.slider("Number of songs in the playlist:", 5, 50, 10)
+        st.session_state.num_songs = st.slider("Number of songs in the playlist:", 5, 50, 10)
 
-        if st.button("Create Playlist"):
-            if user_input:
-                with st.spinner("Creating your playlist..."):
-
-                    if input_type == "Image Upload":
-                        question = f"Create a playlist with {num_songs} songs based on this image."
-                        results = st.session_state.agent.process_request(question, image_string=user_input)
-                    else:
-                        question = f"Create a playlist with {num_songs} songs that match the following description: {user_input}"
-                        results = st.session_state.agent.process_request(question)
-
-                    # Display the final result (assuming the last event contains the playlist information)
-                    if results:
-                        st.success("Playlist created successfully!")
-                        st.write(results[-1])
-                    else:
-                        st.error("Failed to create playlist. Please try again.")
+        if st.button("Generate Playlist Curation"):
+            if st.session_state.user_input:
+                with st.spinner("Generating playlist curation from your recent played tracks..."):
+                    st.session_state.curation = generate_curation(
+                        st.session_state.agent,
+                        st.session_state.input_type,
+                        st.session_state.user_input,
+                        st.session_state.num_songs
+                    )
+                    print(st.session_state.curation)
+                    st.session_state.playlist_created = False
+                    st.session_state.regenerating = False
             else:
                 st.warning("Please provide an input before creating a playlist.")
+        
+        if st.session_state.curation and not st.session_state.regenerating:
+            display_playlist_curation(st.session_state.curation)
+            
+            if st.button("Regenerate Curation"):
+                st.session_state.regenerating = True
+                st.rerun()
+
+            if not st.session_state.playlist_created:
+                if st.button("Create Playlist on Spotify"):
+                    with st.spinner("Creating your playlist on Spotify..."):
+                        playlist_tool = SpotifyPlaylistTool(user_id=user['id'], spotify_token=st.session_state.token_info['access_token'])
+                        result = playlist_tool._run(
+                            track_ids=[track['id'] for track in st.session_state.curation['tracks']],
+                            playlist_name=st.session_state.curation['playlist_name'],
+                            playlist_description=st.session_state.curation['playlist_description']
+                        )
+                        st.success(result)
+                        st.session_state.playlist_created = True
+            else:
+                st.success("Playlist has been created on Spotify!")
+        
+        if st.session_state.regenerating:
+            with st.spinner("Regenerating playlist curation..."):
+                st.session_state.curation = generate_curation(
+                    st.session_state.agent,
+                    st.session_state.input_type,
+                    st.session_state.user_input,
+                    st.session_state.num_songs
+                )
+                st.session_state.playlist_created = False
+                st.session_state.regenerating = False
+            st.rerun()
 
     except spotipy.SpotifyException:
         # Token might be expired or invalid

@@ -15,23 +15,6 @@ class SpotifyFeaturesTool(BaseTool):
     description: str = (
         "A tool that fetches audio features of the most recently saved tracks from Spotify. "
         "This tool does not require any arguments.\n\n"
-        """Description of Return Parameters:
-           acousticness: Acoustic confidence. Ex: 0.00242 (0-1)
-           danceability: Dance suitability. Ex: 0.585
-           duration_ms: Duration in ms. Ex: 237040
-           energy: Intensity measure. Ex: 0.842
-           id: Spotify track ID. Ex: "2takcwOaAZWiXQijPHIx7B"
-           instrumentalness: Vocal prediction. Ex: 0.00686
-           key: Track key. Ex: 9 (-1-11)
-           liveness: Audience presence. Ex: 0.0866
-           loudness: Loudness in dB. Ex: -5.883
-           mode: Track modality. Ex: 0
-           speechiness: Spoken word presence. Ex: 0.0556
-           tempo: Tempo in BPM. Ex: 118.211
-           time_signature: Time signature. Ex: 4 (3-7)
-           type: Object type. Allowed: "audio_features"
-           valence: Musical positiveness. Ex: 0.428 (0-1)
-        """
     )
     args_schema: Type[BaseModel] = BaseModel  # No arguments required
     spotify_token: str = Field(..., description="Access token for Spotify")
